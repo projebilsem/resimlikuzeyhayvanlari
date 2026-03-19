@@ -6,7 +6,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kutup Maceraları</title>
 
+    <!-- 1. Güvenlik ve Çevre Ayarları (En başta olmalı) -->
+    <script type="application/javascript">
+        // Cross-origin 'blanker' hatasını susturmak için yama
+        try {
+            if (typeof window.blanker === 'undefined') {
+                window.blanker = {};
+            }
+        } catch (e) {
+            console.warn("Blanker shim uygulanamadı, ancak devam ediliyor.");
+        }
+
+        // Pygbag Konfigürasyonu (Script yüklenmeden önce tanımlanmalı)
+        window.config = {
+            archive: "kutup.maceralari", 
+            gui_debug: 3,
+            fb_width: 1000,
+            fb_height: 650,
+            _sdl2: "canvas",
+            cdn: "https://pygame-web.github.io/cdn/0.9.3/",
+            autorun: 0,
+            ume_block: 1 
+        };
+    </script>
+
+    <!-- 2. Temel Kütüphaneler -->
     <script src="https://pygame-web.github.io/cdn/0.9.3/browserfs.min.js"></script>
+    
+    <!-- 3. Pygbag Çekirdek Scripti -->
     <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" 
             type="module" id="site" 
             data-python="python3.12" 
@@ -15,56 +42,114 @@
     </script>
 
     <style>
-        body { background-color: #0f172a; color: #f8fafc; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: sans-serif; }
-        #canvas { border: 3px solid #334155; background-color: #000; display: none; image-rendering: auto; }
-        #ui-overlay { position: absolute; background: rgba(15, 23, 42, 0.98); padding: 40px; border-radius: 20px; text-align: center; z-index: 2000; border: 2px solid #38bdf8; min-width: 300px; }
-        .btn-start { background: #38bdf8; color: #0f172a; border: none; padding: 15px 40px; font-size: 1.25rem; font-weight: bold; border-radius: 10px; cursor: pointer; margin-top: 20px; }
-        .btn-start:disabled { background: #1e293b; color: #475569; cursor: wait; }
+        body { 
+            background-color: #0f172a; 
+            color: #f8fafc; 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        #canvas { 
+            border: 3px solid #334155; 
+            background-color: #000; 
+            display: none; 
+            image-rendering: auto; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        #ui-overlay { 
+            position: absolute; 
+            background: rgba(15, 23, 42, 0.98); 
+            padding: 40px; 
+            border-radius: 20px; 
+            text-align: center; 
+            z-index: 2000; 
+            border: 2px solid #38bdf8; 
+            min-width: 320px;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.1);
+        }
+        .btn-start { 
+            background: #38bdf8; 
+            color: #0f172a; 
+            border: none; 
+            padding: 18px 50px; 
+            font-size: 1.4rem; 
+            font-weight: bold; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            margin-top: 25px;
+            transition: all 0.2s ease;
+        }
+        .btn-start:hover:not(:disabled) {
+            background: #7dd3fc;
+            transform: translateY(-2px);
+        }
+        .btn-start:disabled { 
+            background: #1e293b; 
+            color: #475569; 
+            cursor: wait; 
+        }
+        .status-text {
+            color: #94a3b8;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <div id="ui-overlay">
-        <h1 style="color:#38bdf8; margin-top:0;">Kutup Maceraları</h1>
-        <p id="status-msg" style="color:#94a3b8;">Sistem ve görseller hazırlanıyor...</p>
-        <button id="start-button" class="btn-start" disabled>LÜTFEN BEKLEYİN...</button>
+        <h1 style="color:#38bdf8; margin-top:0; font-size: 2.5rem;">Kutup Maceraları</h1>
+        <p id="status-msg" class="status-text">Kütüphaneler yükleniyor...</p>
+        <button id="start-button" class="btn-start" disabled>YÜKLENİYOR...</button>
+        <div id="debug-info" style="font-size: 0.7rem; color: #475569; margin-top: 20px; font-family: monospace;"></div>
     </div>
 
     <canvas class="emscripten" id="canvas" width="1000" height="650" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
     <script type="application/javascript">
-        // Cross-origin hatasını önlemek için yama
-        if (!window.blanker) window.blanker = {};
-
-        window.config = {
-            archive: "kutup.maceralari", 
-            gui_debug: 3,
-            fb_width: 1000,
-            fb_height: 650,
-            _sdl2: "canvas",
-            cdn: "https://pygame-web.github.io/cdn/0.9.3/",
-            ume_block: 1 
-        };
-
         const startButton = document.getElementById('start-button');
         const statusMsg = document.getElementById('status-msg');
         const overlay = document.getElementById('ui-overlay');
         const canvas = document.getElementById('canvas');
+        const debugInfo = document.getElementById('debug-info');
 
         // Python tarafı hazır olunca butonu aç
         function custom_postrun() {
-            startButton.innerText = "OYUNA BAŞLA";
+            startButton.innerText = "MACERAYA BAŞLA";
             startButton.disabled = false;
-            statusMsg.innerText = "Macera hazır!";
+            statusMsg.innerText = "Oyun hazır!";
+            statusMsg.style.color = "#4ecca3";
         }
 
         startButton.onclick = function() {
+            // Medya etkileşimini (Sound/Music) serbest bırak
+            if (window.MM) {
+                window.MM.UME = true;
+            }
+            
             overlay.classList.add('hidden');
             canvas.style.display = "block";
             canvas.focus();
-            if (window.MM) window.MM.UME = true;
+            
+            console.log("Kullanıcı etkileşimi sağlandı, motor başlatılıyor.");
         };
+
+        // BrowserFS ve Blanker kontrolü
+        window.addEventListener('load', () => {
+            let checks = [];
+            if (typeof BrowserFS !== 'undefined') checks.push("BrowserFS: OK");
+            else checks.push("BrowserFS: EKSİK");
+            
+            if (window.blanker) checks.push("Blanker: OK");
+            
+            debugInfo.innerText = checks.join(" | ");
+        });
     </script>
 </body>
 </html>
